@@ -1,0 +1,44 @@
+FROM golang
+# RUN export GO111MODULE=on
+# RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
+# RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
+# RUN export PATH="$PATH:$(go env GOPATH)/bin"
+# RUN git clone -b v1.46.0 --depth 1 https://github.com/grpc/grpc-go
+# RUN cd grpc-go/examples/helloworld
+
+RUN go get -u google.golang.org/grpc && \
+    go get -u github.com/golang/protobuf/protoc-gen-go
+
+# Install protoc and zip system library
+RUN apt-get update && apt-get install -y zip && \
+    mkdir /opt/protoc && cd /opt/protoc && wget https://github.com/protocolbuffers/protobuf/releases/download/v3.7.0/protoc-3.7.0-linux-x86_64.zip && \
+    unzip protoc-3.7.0-linux-x86_64.zip
+
+ENV PATH=$PATH:$GOPATH/bin:/opt/protoc/bin
+
+# Copy the grpc proto file and generate the go module
+RUN mkdir -p /go/src/helloworld
+COPY /helloworld/helloworld.proto /go/src/helloworld
+RUN cd /go/src && \
+    protoc -I helloworld/ helloworld/helloworld.proto --go_out=plugins=grpc:helloworld
+
+
+
+# EXPOSE 50051
+
+# Copy the project to be executed
+RUN mkdir -p /go/src/grpc-server
+COPY /greeter_server/main.go /go/src/grpc-server
+RUN mkdir -p /go/src/grpc-client 
+COPY /greeter_client/main.go /go/src/grpc-client
+
+#Build server
+WORKDIR /go/src/grpc-server 
+ENTRYPOINT go run main.go
+
+
+#Build client
+# WORKDIR /go/src/grpc-client
+# ENTRYPOINT ["/bin/bash","-c"]
+# CMD [ "RANDOM=$$; while true;do go run main.go --name=$SRVNAME:$RANDOM ;sleep 1; done" ]
+
